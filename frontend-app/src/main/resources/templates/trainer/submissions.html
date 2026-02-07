@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Submissions</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
+</head>
+<body>
+<nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+        <a class="navbar-brand" th:href="@{/trainer/assessments}">SkillDev</a>
+    </div>
+</nav>
+<div class="container mt-4">
+    <div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
+    <h1>Submissions for Assessment <span th:text="${assessmentId}"></span></h1>
+    <table class="table table-striped">
+        <thead><tr><th>ID</th><th>Trainee ID</th><th>Score</th><th>Status</th><th>Evaluate</th></tr></thead>
+        <tbody>
+            <tr th:each="s : ${submissions}">
+                <td th:text="${s.id}"></td>
+                <td th:text="${s.traineeId}"></td>
+                <td th:text="${s.score} + ' / ' + ${s.maxScore}"></td>
+                <td th:text="${s.status}"></td>
+                <td>
+                    <form th:if="${s.status != 'EVALUATED'}" th:action="@{/trainer/assessments/submissions/{id}/evaluate(id=${s.id})}" method="post" class="d-inline">
+                        <input type="hidden" name="trainerId" value="1"/>
+                        <input type="hidden" name="assessmentId" th:value="${assessmentId}"/>
+                        <input type="text" name="courseName" placeholder="Course name" class="form-control form-control-sm d-inline-block w-auto"/>
+                        <button type="submit" class="btn btn-sm btn-success">Mark Passed / Issue Certificate</button>
+                    </form>
+                        <span th:if="${s.status == 'EVALUATED'}" class="text-muted">Evaluated</span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

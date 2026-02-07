@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title th:text="${pageTitle != null ? pageTitle : 'Skill Development'}">Skill Development</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+        <a class="navbar-brand" th:href="@{/}">SkillDev</a>
+        <div class="navbar-nav ms-auto" th:if="${username}">
+            <span class="navbar-text text-white me-3" th:text="${username}">User</span>
+            <a class="nav-link text-white" th:href="@{/profile}">Profile</a>
+            <form th:action="@{/auth/logout}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-link text-white text-decoration-none">Logout</button>
+            </form>
+        </div>
+    </div>
+</nav>
+<div class="container mt-4">
+    <div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+    <div th:replace="~{::content}">Page content</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

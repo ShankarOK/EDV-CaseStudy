@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Skill Development &amp; Training Management</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
+</head>
+<body>
+<nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">Skill Development &amp; Training Management</span>
+    </div>
+</nav>
+<div class="container mt-5 text-center">
+    <h1 class="mb-4">Welcome</h1>
+    <p class="lead mb-4">Sign in to access your dashboard.</p>
+    <div class="d-flex gap-3 justify-content-center flex-wrap">
+        <a th:href="@{/login}" class="btn btn-primary btn-lg">Login as Admin</a>
+        <a th:href="@{/login}" class="btn btn-success btn-lg">Login as Trainer</a>
+        <a th:href="@{/login}" class="btn btn-info btn-lg text-white">Login as Trainee</a>
+    </div>
+    <p class="mt-4 text-muted">Use: admin/admin123, trainer/trainer123, trainee/trainee123</p>
+</div>
+</body>
+</html>

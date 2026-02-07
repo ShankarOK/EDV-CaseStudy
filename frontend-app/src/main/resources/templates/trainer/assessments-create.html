@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Create Assessment</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
+</head>
+<body>
+<nav class="navbar navbar-dark bg-primary">
+    <div class="container-fluid">
+        <a class="navbar-brand" th:href="@{/trainer/assessments}">SkillDev</a>
+    </div>
+</nav>
+<div class="container mt-4">
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+    <h1>Create Assessment</h1>
+    <form th:action="@{/trainer/assessments/create}" method="post">
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" name="title" class="form-control" required/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Course</label>
+            <select name="courseId" class="form-select" required>
+                <option value="">-- Select --</option>
+                <option th:each="c : ${courses}" th:value="${c.id}" th:text="${c.title}"></option>
+            </select>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Passing Score</label>
+                <input type="number" name="passingScore" class="form-control" min="0" required/>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Max Score</label>
+                <input type="number" name="maxScore" class="form-control" min="1" required/>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Due Date</label>
+            <input type="date" name="dueDate" class="form-control" required/>
+        </div>
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a th:href="@{/trainer/assessments}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+</body>
+</html>

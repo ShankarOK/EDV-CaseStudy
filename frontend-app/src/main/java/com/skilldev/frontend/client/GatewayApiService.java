@@ -53,6 +53,13 @@ public class GatewayApiService {
         return res.getBody();
     }
 
+    /** GET and return full response (e.g. for PDF download to forward headers). */
+    public ResponseEntity<byte[]> getForDownload(HttpSession session, String path) {
+        String url = apiPrefix + path;
+        HttpEntity<Void> entity = new HttpEntity<>(headersWithAuth(session));
+        return restTemplate.exchange(url, HttpMethod.GET, entity, byte[].class);
+    }
+
     public <T> List<T> getList(HttpSession session, String path, ParameterizedTypeReference<List<T>> typeRef) {
         String url = apiPrefix + path;
         HttpEntity<Void> entity = new HttpEntity<>(headersWithAuth(session));
@@ -97,4 +104,7 @@ public class GatewayApiService {
     }
 
     public record LoginResponse(String token, String username, String role) {}
+
+    /** Phase 2: response from GET /auth/me */
+    public record MeResponse(String username, String role, Long entityId, String displayName, String email) {}
 }

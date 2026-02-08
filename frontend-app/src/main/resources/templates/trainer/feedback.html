@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8"/>
-    <title>Feedback</title>
+    <title>Feedback Management</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
 </head>
 <body>
@@ -13,7 +13,22 @@
 </nav>
 <div class="container mt-4">
     <h1>Feedback Management</h1>
-    <p>Record and view feedback for trainees and courses (placeholder).</p>
+    <p>Feedback received from trainees.</p>
+
+    <table class="table table-striped" th:if="${feedbackList != null and !feedbackList.isEmpty()}">
+        <thead><tr><th>ID</th><th>Trainee ID</th><th>Rating</th><th>Comment</th><th>Course ID</th><th>Date</th></tr></thead>
+        <tbody>
+            <tr th:each="f : ${feedbackList}">
+                <td th:text="${f.id}"></td>
+                <td th:text="${f.traineeId}"></td>
+                <td th:text="${f.rating}"></td>
+                <td th:text="${f.comment}"></td>
+                <td th:text="${f.courseId}"></td>
+                <td th:text="${f.createdAt}"></td>
+            </tr>
+        </tbody>
+    </table>
+    <p th:if="${feedbackList == null or feedbackList.isEmpty()}" class="text-muted">No feedback received yet.</p>
 </div>
 </body>
 </html>

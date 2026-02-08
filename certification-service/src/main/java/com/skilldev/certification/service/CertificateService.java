@@ -9,6 +9,11 @@ import com.skilldev.certification.repository.CertificateRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.lowagie.text.*;
+import com.lowagie.text.pdf.PdfWriter;
+
+import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,5 +76,27 @@ public class CertificateService {
         cert.setCourseName(request.courseName() != null ? request.courseName() : "Course");
         cert.setValidityMonths(24);
         return certificateRepository.save(cert);
+    }
+
+    /** Generate PDF for certificate (Phase 5); in-memory, not stored. */
+    public byte[] generatePdf(Certificate cert) throws DocumentException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4);
+        PdfWriter.getInstance(document, out);
+        document.open();
+        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
+        Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 12);
+        document.add(new Paragraph("Certificate of Completion", titleFont));
+        document.add(new Paragraph(" "));
+        document.add(new Paragraph("This is to certify that", normalFont));
+        document.add(new Paragraph("Trainee ID: " + cert.getTraineeId(), normalFont));
+        document.add(new Paragraph("has successfully completed", normalFont));
+        document.add(new Paragraph(cert.getCourseName(), titleFont));
+        document.add(new Paragraph(" "));
+        document.add(new Paragraph("Certificate Code: " + cert.getCertificateCode(), normalFont));
+        document.add(new Paragraph("Issue Date: " + (cert.getIssueDate() != null ? cert.getIssueDate().format(DateTimeFormatter.ISO_LOCAL_DATE) : "N/A"), normalFont));
+        document.add(new Paragraph("Validity: " + (cert.getValidityMonths() != null ? cert.getValidityMonths() + " months" : "N/A"), normalFont));
+        document.close();
+        return out.toByteArray();
     }
 }

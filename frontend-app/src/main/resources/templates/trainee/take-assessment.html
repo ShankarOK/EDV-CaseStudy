@@ -15,7 +15,6 @@
     <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
     <h1>Assessment <span th:text="${assessmentId}"></span></h1>
     <form th:action="@{/trainee/assessments/{id}/submit(id=${assessmentId})}" method="post">
-        <input type="hidden" name="traineeId" value="1"/>
         <div th:each="q, iStat : ${questions}" class="card mb-3">
             <div class="card-body">
                 <p class="fw-bold" th:text="${iStat.count + '. ' + q.questionText}"></p>

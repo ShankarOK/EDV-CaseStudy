@@ -4,6 +4,9 @@ import com.skilldev.frontend.client.GatewayApiService;
 import com.skilldev.frontend.web.AuthInterceptor;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -25,10 +28,14 @@ public class TraineeController {
 
     @GetMapping("/dashboard")
     public String dashboard(HttpSession session, Model model) {
+        Long traineeId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID);
+        if (traineeId == null) {
+            return "redirect:/login?redirect=/trainee/dashboard";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
             model.addAttribute("courses", api.getList(session, "/courses/active", new ParameterizedTypeReference<>() {}));
-            model.addAttribute("certificates", List.of()); // could get by traineeId if we had it in session
+            model.addAttribute("certificates", api.getList(session, "/certificates/trainee/" + traineeId, new ParameterizedTypeReference<>() {}));
         } catch (Exception e) {
             model.addAttribute("courses", List.of());
             model.addAttribute("certificates", List.of());
@@ -38,6 +45,9 @@ public class TraineeController {
 
     @GetMapping("/courses")
     public String courses(HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID) == null) {
+            return "redirect:/login?redirect=/trainee/courses";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
             model.addAttribute("courses", api.getList(session, "/courses/active", new ParameterizedTypeReference<>() {}));
@@ -49,6 +59,9 @@ public class TraineeController {
 
     @GetMapping("/enroll")
     public String enrollForm(HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID) == null) {
+            return "redirect:/login?redirect=/trainee/enroll";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
             model.addAttribute("courses", api.getList(session, "/courses/active", new ParameterizedTypeReference<>() {}));
@@ -59,8 +72,12 @@ public class TraineeController {
     }
 
     @PostMapping("/enroll")
-    public String enroll(@RequestParam Long traineeId, @RequestParam Long courseId,
-                        HttpSession session, RedirectAttributes ra) {
+    public String enroll(@RequestParam Long courseId, HttpSession session, RedirectAttributes ra) {
+        Long traineeId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID);
+        if (traineeId == null) {
+            ra.addFlashAttribute("error", "Session expired. Please log in again.");
+            return "redirect:/login";
+        }
         try {
             api.post(session, "/trainees/" + traineeId + "/enroll?courseId=" + courseId, null, Map.class);
             ra.addFlashAttribute("message", "Enrolled successfully.");
@@ -72,6 +89,9 @@ public class TraineeController {
 
     @GetMapping("/assessments")
     public String assessments(HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID) == null) {
+            return "redirect:/login?redirect=/trainee/assessments";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
             model.addAttribute("assessments", api.getList(session, "/assessments", new ParameterizedTypeReference<>() {}));
@@ -83,6 +103,9 @@ public class TraineeController {
 
     @GetMapping("/assessments/{id}/take")
     public String takeAssessment(@PathVariable Long id, HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID) == null) {
+            return "redirect:/login?redirect=/trainee/assessments/" + id + "/take";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         model.addAttribute("assessmentId", id);
         try {
@@ -95,9 +118,13 @@ public class TraineeController {
     }
 
     @PostMapping("/assessments/{id}/submit")
-    public String submitAssessment(@PathVariable Long id, @RequestParam Long traineeId,
-                                   @RequestParam Map<String, String> allParams,
+    public String submitAssessment(@PathVariable Long id, @RequestParam Map<String, String> allParams,
                                    HttpSession session, RedirectAttributes ra) {
+        Long traineeId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID);
+        if (traineeId == null) {
+            ra.addFlashAttribute("error", "Session expired. Please log in again.");
+            return "redirect:/login";
+        }
         try {
             Map<String, String> answersMap = allParams.entrySet().stream()
                     .filter(e -> e.getKey().startsWith("q_"))
@@ -115,10 +142,13 @@ public class TraineeController {
 
     @GetMapping("/results")
     public String results(HttpSession session, Model model) {
+        Long traineeId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID);
+        if (traineeId == null) {
+            return "redirect:/login?redirect=/trainee/results";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
-            // Use traineeId=1 for demo; in real app get from session or profile
-            model.addAttribute("submissions", api.getList(session, "/assessments/trainee/1/submissions", new ParameterizedTypeReference<>() {}));
+            model.addAttribute("submissions", api.getList(session, "/assessments/trainee/" + traineeId + "/submissions", new ParameterizedTypeReference<>() {}));
         } catch (Exception e) {
             model.addAttribute("submissions", List.of());
         }
@@ -127,18 +157,75 @@ public class TraineeController {
 
     @GetMapping("/certificates")
     public String certificates(HttpSession session, Model model) {
+        Long traineeId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID);
+        if (traineeId == null) {
+            return "redirect:/login?redirect=/trainee/certificates";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
-            model.addAttribute("certificates", api.getList(session, "/certificates/trainee/1", new ParameterizedTypeReference<>() {}));
+            model.addAttribute("certificates", api.getList(session, "/certificates/trainee/" + traineeId, new ParameterizedTypeReference<>() {}));
         } catch (Exception e) {
             model.addAttribute("certificates", List.of());
         }
         return "trainee/certificates";
     }
 
+    @GetMapping("/certificates/{id}/download")
+    public ResponseEntity<byte[]> downloadCertificate(@PathVariable Long id, HttpSession session) {
+        Long traineeId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID);
+        if (traineeId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        ResponseEntity<byte[]> response = api.getForDownload(session, "/certificates/" + id + "/download");
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
+            if (response.getHeaders().getContentDisposition() != null) {
+                headers.setContentDisposition(response.getHeaders().getContentDisposition());
+            } else {
+                headers.setContentDispositionFormData("attachment", "certificate-" + id + ".pdf");
+            }
+            return ResponseEntity.ok().headers(headers).body(response.getBody());
+        }
+        return ResponseEntity.status(response.getStatusCode()).build();
+    }
+
     @GetMapping("/feedback")
     public String feedback(HttpSession session, Model model) {
+        Long traineeId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID);
+        if (traineeId == null) {
+            return "redirect:/login?redirect=/trainee/feedback";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
+        try {
+            model.addAttribute("feedbackList", api.getList(session, "/feedback/trainee/" + traineeId, new ParameterizedTypeReference<>() {}));
+        } catch (Exception e) {
+            model.addAttribute("feedbackList", List.of());
+        }
         return "trainee/feedback";
+    }
+
+    @PostMapping("/feedback")
+    public String submitFeedback(@RequestParam Integer rating, @RequestParam String comment,
+                                 @RequestParam(required = false) Long trainerId, @RequestParam(required = false) Long courseId,
+                                 HttpSession session, RedirectAttributes ra) {
+        Long traineeId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINEE_ID);
+        if (traineeId == null) {
+            ra.addFlashAttribute("error", "Session expired. Please log in again.");
+            return "redirect:/login";
+        }
+        try {
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("traineeId", traineeId);
+            body.put("rating", rating);
+            body.put("comment", comment != null ? comment : "");
+            if (trainerId != null) body.put("trainerId", trainerId);
+            if (courseId != null) body.put("courseId", courseId);
+            api.post(session, "/feedback", body, Map.class);
+            ra.addFlashAttribute("message", "Feedback submitted.");
+        } catch (Exception e) {
+            ra.addFlashAttribute("error", "Failed to submit (rating 1–5, comment required).");
+        }
+        return "redirect:/trainee/feedback";
     }
 }

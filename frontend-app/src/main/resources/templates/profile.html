@@ -15,7 +15,35 @@
     <h1>Profile</h1>
     <p><strong>Username:</strong> <span th:text="${username}"></span></p>
     <p><strong>Role:</strong> <span th:text="${role}"></span></p>
-    <p class="text-muted">Update details and change password (via Security Service) can be added here.</p>
+
+    <div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <h2 class="h5 mt-4">Update personal details</h2>
+    <form th:action="@{/profile/update}" method="post" class="mb-4">
+        <div class="mb-3">
+            <label class="form-label">Display name</label>
+            <input type="text" name="displayName" class="form-control" th:value="${displayName}" placeholder="Your display name"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control" th:value="${email}" placeholder="your@email.com"/>
+        </div>
+        <button type="submit" class="btn btn-primary">Update details</button>
+    </form>
+
+    <h2 class="h5 mt-4">Change password</h2>
+    <form th:action="@{/profile/password}" method="post">
+        <div class="mb-3">
+            <label class="form-label">Current password</label>
+            <input type="password" name="currentPassword" class="form-control" required/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">New password</label>
+            <input type="password" name="newPassword" class="form-control" required minlength="1"/>
+        </div>
+        <button type="submit" class="btn btn-primary">Change password</button>
+    </form>
 </div>
 </body>
 </html>

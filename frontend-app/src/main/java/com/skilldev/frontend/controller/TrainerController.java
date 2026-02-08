@@ -24,6 +24,9 @@ public class TrainerController {
 
     @GetMapping("/dashboard")
     public String dashboard(HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINER_ID) == null) {
+            return "redirect:/login?redirect=/trainer/dashboard";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
             List<Map<String, Object>> assessments = api.getList(session, "/assessments", new ParameterizedTypeReference<>() {});
@@ -36,6 +39,9 @@ public class TrainerController {
 
     @GetMapping("/assessments")
     public String assessments(HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINER_ID) == null) {
+            return "redirect:/login?redirect=/trainer/assessments";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
             model.addAttribute("assessments", api.getList(session, "/assessments", new ParameterizedTypeReference<>() {}));
@@ -47,6 +53,9 @@ public class TrainerController {
 
     @GetMapping("/assessments/create")
     public String createAssessmentForm(HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINER_ID) == null) {
+            return "redirect:/login?redirect=/trainer/assessments/create";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         try {
             model.addAttribute("courses", api.getList(session, "/courses/active", new ParameterizedTypeReference<>() {}));
@@ -60,6 +69,11 @@ public class TrainerController {
     public String createAssessment(@RequestParam String title, @RequestParam Long courseId,
                                   @RequestParam Integer passingScore, @RequestParam Integer maxScore,
                                   @RequestParam String dueDate, HttpSession session, RedirectAttributes ra) {
+        Long trainerId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINER_ID);
+        if (trainerId == null) {
+            ra.addFlashAttribute("error", "Session expired. Please log in again.");
+            return "redirect:/login";
+        }
         try {
             Map<String, Object> body = Map.of(
                     "title", title,
@@ -67,7 +81,7 @@ public class TrainerController {
                     "passingScore", passingScore,
                     "maxScore", maxScore,
                     "dueDate", dueDate,
-                    "createdByTrainerId", 1L,
+                    "createdByTrainerId", trainerId,
                     "status", "PUBLISHED"
             );
             api.post(session, "/assessments", body, Map.class);
@@ -80,6 +94,9 @@ public class TrainerController {
 
     @GetMapping("/assessments/{id}/submissions")
     public String submissions(@PathVariable Long id, HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINER_ID) == null) {
+            return "redirect:/login?redirect=/trainer/assessments/" + id + "/submissions";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         model.addAttribute("assessmentId", id);
         try {
@@ -92,13 +109,22 @@ public class TrainerController {
 
     @PostMapping("/assessments/submissions/{submissionId}/evaluate")
     public String evaluate(@PathVariable Long submissionId, @RequestParam(required = false) Integer score,
-                          @RequestParam Long trainerId, @RequestParam(required = false) String courseName,
+                          @RequestParam(required = false) String courseName,
                           @RequestParam(required = false) Long assessmentId,
                           HttpSession session, RedirectAttributes ra) {
+        Long trainerId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINER_ID);
+        if (trainerId == null) {
+            ra.addFlashAttribute("error", "Session expired. Please log in again.");
+            return "redirect:/login";
+        }
         try {
             StringBuilder path = new StringBuilder("/assessments/submissions/").append(submissionId).append("/evaluate?trainerId=").append(trainerId);
-            if (courseName != null && !courseName.isBlank()) path.append("&courseName=").append(java.net.URLEncoder.encode(courseName, java.nio.charset.StandardCharsets.UTF_8));
-            if (score != null) path.append("&score=").append(score);
+            if (courseName != null && !courseName.isBlank()) {
+                path.append("&courseName=").append(java.net.URLEncoder.encode(courseName, java.nio.charset.StandardCharsets.UTF_8));
+            }
+            if (score != null) {
+                path.append("&score=").append(score);
+            }
             api.postNoBody(session, path.toString(), Map.class);
             ra.addFlashAttribute("message", "Submission evaluated. Certificate issued if passed.");
         } catch (Exception e) {
@@ -112,13 +138,25 @@ public class TrainerController {
 
     @GetMapping("/results")
     public String results(HttpSession session, Model model) {
+        if (session.getAttribute(AuthInterceptor.SESSION_TRAINER_ID) == null) {
+            return "redirect:/login?redirect=/trainer/results";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
         return "trainer/results";
     }
 
     @GetMapping("/feedback")
     public String feedback(HttpSession session, Model model) {
+        Long trainerId = (Long) session.getAttribute(AuthInterceptor.SESSION_TRAINER_ID);
+        if (trainerId == null) {
+            return "redirect:/login?redirect=/trainer/feedback";
+        }
         model.addAttribute("username", session.getAttribute(AuthInterceptor.SESSION_USERNAME));
+        try {
+            model.addAttribute("feedbackList", api.getList(session, "/feedback/trainer/" + trainerId, new ParameterizedTypeReference<>() {}));
+        } catch (Exception e) {
+            model.addAttribute("feedbackList", List.of());
+        }
         return "trainer/feedback";
     }
 }

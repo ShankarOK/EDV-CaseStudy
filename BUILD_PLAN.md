@@ -1,240 +1,330 @@
 # Skill Development & Training Management System — Build Plan
 
-This document defines the order and scope for building each microservice so that dependencies are ready when needed and each step is testable.
+This document defines the plan to **complete** the project to full compliance with the official **Project Description**. The system implements a microservices-based solution for training institutes and corporate learning: course catalogs, trainee profiles, assignments, assessments, certifications. It ensures transparent operations, learning standards, efficient course delivery, and accurate record-keeping.
+
+**Scope:** Implement only what is given in the project description — nothing less.
+
+**Constraints:** Do not redesign the architecture. Do not remove existing logic. Complete missing spec-required features with minimal, clean, production-style changes.
 
 ---
 
-## Principles
+## Project Description (Summary)
 
-- **Build in dependency order**: Registry → Gateway → Security → Validation → domain services → frontend.
-- **One service at a time**: Finish and verify each before moving to the next.
-- **Incremental integration**: Each new service registers with Eureka and (where applicable) uses Gateway and Security.
-- **Database per service**: Each business service gets its own schema/DB configuration (can share one MySQL instance with different DBs/schemas).
-
----
-
-## Phase 1: Infrastructure (Discovery, Routing, Security)
-
-Services in this phase have no business domain; they enable the rest of the system.
-
-### 1.1 Eureka Server
-
-**Purpose:** Service registry so all other services can register and be discovered.
-
-**Deliverables:**
-- Add `spring-cloud-starter-netflix-eureka-server` (with Spring Cloud BOM compatible with Boot 3.5.x).
-- Main class: `@EnableEurekaServer`.
-- Config: `server.port=8761`, `eureka.client.register-with-eureka=false`, `eureka.client.fetch-registry=false`.
-- Run and confirm dashboard at `http://localhost:8761`.
-
-**Exit criteria:** Eureka starts; dashboard is reachable; no clients yet.
+- **Technology Stack:** Microservices; Eureka Server (registry); Spring Cloud Gateway (API Gateway); Java, Spring Boot; Feign Client; Thymeleaf (frontend); MySQL (database); Security Service (Spring Security, JWT); Global Exception Handling; Validation Service.
+- **Microservices:** Course, Trainee, Trainer, Assessment, Certification, Validation, Security. Each has defined responsibilities (register/manage entities, integrate with Validation/other services, access controlled via Security).
+- **Frontend (Thymeleaf):** Home; Admin (Dashboard, Register Course, Manage Courses, Assign Trainer); Trainer (Dashboard, Create Assessment, Evaluate Assessment, View Results, Feedback Management); Trainee (Dashboard, View Courses, Enroll, Assessment, Results, Certificate, Feedback); Profile (all roles — update details, change password).
+- **Security:** Centralized auth at API Gateway → Security Service (JWT validation). Roles: Admin, Trainer, Trainee. Access controlled per role.
+- **Deployment:** Docker containers — Eureka first, then Gateway + Security, then MySQL and business services, then Frontend; shared network; validation per deployment document.
 
 ---
 
-### 1.2 API Gateway
+## Spec compliance summary (vs original description)
 
-**Purpose:** Single entry point; route requests to services by name via Eureka; later integrate with Security for token validation.
+| Area | Status | Details |
+|------|--------|--------|
+| Overview, technology stack, all 7 microservices | ✅ Done | Eureka, Gateway, Security, Validation, Course, Trainee, Trainer, Assessment, Certification as described. MySQL primary for deployment; H2 dev-only. |
+| Frontend UI pages (Home, Admin, Trainer, Trainee, Profile) | ✅ Done | All pages per description; session-based traineeId/trainerId; feedback; certificate PDF; Profile update/change password forms. |
+| Profile Page (all roles) | ✅ Done | Update details and change password forms wired to PUT /auth/profile and PUT /auth/password. |
+| Inter-service communication, Security, Deployment | ✅ Done | As per description. |
 
-**Deliverables:**
-- Add Spring Cloud Gateway + Eureka client dependencies.
-- Config: `server.port=8080`, Eureka `defaultZone=http://localhost:8761/eureka/`.
-- Route definitions (path → service-id) for each future service (e.g. `/api/courses/**` → `course-service`). Routes can be placeholders that 404 until services exist.
-- Run and confirm Gateway starts and registers with Eureka.
-
-**Exit criteria:** Gateway registered in Eureka; routes configured; downstream 404s are acceptable until services exist.
-
----
-
-### 1.3 Security Service
-
-**Purpose:** Central auth: login, JWT issue/validate, user and role management (Admin, Trainer, Trainee).
-
-**Deliverables:**
-- Add `spring-boot-starter-web`, `spring-boot-starter-security`, JWT library (e.g. jjwt), Eureka client.
-- Config: port (e.g. `8081`), Eureka registration, JWT secret and expiry.
-- User entity/repository (in-memory or MySQL): username, password (encoded), role.
-- Endpoints: `POST /auth/login` (returns JWT), optional `POST /auth/register` (for trainee self-registration if in scope), token validation endpoint or filter for Gateway.
-- Role-based authority (Admin, Trainer, Trainee).
-- Run and confirm registration with Eureka; login returns a valid JWT.
-
-**Exit criteria:** Security Service registered; login returns JWT; roles present in token; ready for Gateway to validate tokens.
-
-**Optional (can be Phase 1.4):** Gateway filter that validates JWT via Security Service (or shared secret) and forwards user/roles to downstream services. If deferred, add a simple “health” or “public” route so Gateway is still usable.
+**Full audit (what’s right, what’s wrong, how to correct):** **PROJECT_STATUS.md**.
 
 ---
 
-## Phase 2: Validation & Core Domain Services
+## Objective
 
-These services hold core data and call Validation for rules.
+Bring the project to full compliance with the official project description, focusing on:
 
-### 2.1 Validation Service
-
-**Purpose:** Centralized business and data validation used by Course, Trainee, Trainer, Assessment, Certification.
-
-**Deliverables:**
-- Add `spring-boot-starter-web`, Eureka client.
-- Config: port, Eureka registration.
-- Validation endpoints (or single generic endpoint) for:
-  - Course: duration, dates, trainer assignment.
-  - Trainee: unique email/contact, enrollment eligibility.
-  - Trainer: expertise vs course category, availability.
-  - Assessment: passing criteria, score ranges.
-  - Certification: completion and eligibility.
-- Implementation can start with simple rule logic (e.g. duration > 0, dates valid); no DB required for rules initially.
-- Run and confirm registered in Eureka; Gateway route returns 200 for a sample validation call.
-
-**Exit criteria:** Validation Service registered; at least one validation endpoint callable via Gateway; ready for other services to call via Feign.
+- **Centralized security enforcement** (Gateway JWT validation)
+- **Proper user–entity mapping** (traineeId / trainerId from auth)
+- **Profile & password management** (Security Service APIs)
+- **Feedback backend** (persistence and APIs for existing UI)
+- **Certificate PDF download** (generate and return PDF)
+- **Global exception handling** (standardized error responses)
+- **Docker-based deployment** (containerize full system)
 
 ---
 
-### 2.2 Trainer Service
+## Phase 1 — API Gateway: JWT Enforcement (CRITICAL) ✅ DONE
 
-**Purpose:** Trainer profiles, specialization, availability; used by Course for assignment.
+**Goal:** Ensure all `/api/**` routes are protected by JWT validation via the Security Service.
 
-**Deliverables:**
-- Add `spring-boot-starter-web`, `spring-boot-starter-data-jpa`, Eureka client, MySQL driver, Feign (optional here; Course will call Trainer).
-- Config: port (e.g. `8082`), Eureka, datasource (e.g. `trainer_db` or schema).
-- Entity: Trainer (id, name, specialization, experience, availability, etc.).
-- Repository, service, REST controller: CRUD for trainers.
-- Secure endpoints (Admin, Trainer) via Gateway + JWT (Security); can use a simple “role” header or shared validation in Gateway.
-- Run and confirm registered; CRUD works via Gateway with valid JWT.
+### Tasks
 
-**Exit criteria:** Trainer CRUD works through Gateway; Eureka shows `trainer-service`; DB persists data.
+1. Implement a **GlobalFilter** in Spring Cloud Gateway. ✅
+2. **Skip** authentication for:
+   - `/api/auth/login` ✅
+   - `/api/auth/register` (if present) ✅
+3. For all other `/api/**` requests:
+   - Read `Authorization: Bearer <token>` ✅
+   - Call `POST /auth/validate` on Security Service ✅
+   - If invalid or missing → return **401 Unauthorized** ✅
+   - If valid → forward request ✅
 
----
+### Constraints
 
-### 2.3 Course Service
+- Use **WebClient** (Gateway is reactive). ✅
+- Do not block threads. ✅
+- Do not change existing route definitions. ✅
 
-**Purpose:** Course catalog; trainer assignment; integrates with Trainer and Validation.
+### Exit criteria
 
-**Deliverables:**
-- Add `spring-boot-starter-web`, `spring-boot-starter-data-jpa`, Eureka client, MySQL driver, OpenFeign.
-- Config: port (e.g. `8083`), Eureka, datasource (e.g. `course_db`), Feign client for Trainer Service and Validation Service.
-- Entity: Course (id, title, category, duration, description, start/end dates, trainerId or similar).
-- Feign clients: get trainer by id; call Validation for course rules (duration, dates, trainer).
-- Repository, service, REST controller: CRUD; on create/update call Validation (and optionally Trainer) via Feign.
-- Access: Admin, Trainer only (enforced via Gateway/Security).
-- Run and confirm CRUD and validation integration via Gateway.
+- Unauthenticated requests to `/api/courses`, `/api/trainees`, etc. return 401. ✅
+- Requests with valid `Authorization: Bearer <token>` are forwarded and succeed. ✅
+- Login and (if present) register remain publicly accessible. ✅
 
-**Exit criteria:** Course CRUD works; Validation and Trainer calls work via Feign; service registered.
+### Files changed (implemented)
 
----
-
-### 2.4 Trainee Service
-
-**Purpose:** Trainee profiles, enrollment; integrates with Validation (and later Assessment/Certification).
-
-**Deliverables:**
-- Add `spring-boot-starter-web`, `spring-boot-starter-data-jpa`, Eureka client, MySQL driver, OpenFeign.
-- Config: port (e.g. `8084`), Eureka, datasource (e.g. `trainee_db`), Feign client for Validation Service.
-- Entity: Trainee (id, name, contact, email, qualification, skill preferences, etc.).
-- Repository, service, REST controller: CRUD; on create/update call Validation (e.g. unique email/contact).
-- Endpoints for “enroll in course” (can store enrollment in Trainee DB or a separate table; Course enrollment might involve Course Service later).
-- Access: Admin, Trainee (self), or as defined by spec.
-- Run and confirm registration and Validation integration via Gateway.
-
-**Exit criteria:** Trainee CRUD and validation work; enrollment structure in place; ready for Assessment/Certification integration.
+- `api-gateway/pom.xml` — added `spring-boot-starter-webflux` for WebClient.
+- `api-gateway/src/main/java/com/skilldev/gateway/filter/JwtAuthGlobalFilter.java` — GlobalFilter with `Ordered.HIGHEST_PRECEDENCE`; skips non-`/api/` and `/api/auth/login`, `/api/auth/register`; validates token via client; returns 401 otherwise.
+- `api-gateway/src/main/java/com/skilldev/gateway/filter/JwtValidationClient.java` — reactive client that calls `POST {security-service-url}/auth/validate` with `Authorization` header.
+- `api-gateway/src/main/resources/application.properties` — added `app.security-service-url=http://localhost:8081`.
 
 ---
 
-## Phase 3: Assessment & Certification
+## Phase 2 — Security Service: User–Entity Mapping + Profile APIs ✅ DONE
 
-These depend on Course, Trainee, Trainer, and Validation.
+**Goal:** Eliminate hardcoded traineeId/trainerId in frontend; support profile and password management.
 
-### 3.1 Assessment Service
+### Tasks
 
-**Purpose:** Assessments, question bank, scoring, trainee results; triggers certification on success.
+**1. Add `GET /auth/me`** ✅
 
-**Deliverables:**
-- Add `spring-boot-starter-web`, `spring-boot-starter-data-jpa`, Eureka client, MySQL driver, OpenFeign.
-- Config: port (e.g. `8085`), Eureka, datasource (e.g. `assessment_db`), Feign to Validation, Certification, optionally Security.
-- Entities: Assessment, Question, TraineeResult/Submission, etc.
-- Validation: scoring rules, completion criteria via Validation Service.
-- Endpoints: create/schedule assessment (Trainer/Admin), submit answers (Trainee), evaluate (Trainer), get results; on passing, call Certification Service to trigger certificate.
-- Access: role-based via Gateway/Security.
-- Run and confirm integration with Validation and Certification (e.g. “issue certificate” call).
+- Extract username and role from JWT (from `Authorization` header or dedicated filter).
+- Return JSON: `{ "username", "role", "entityId", "displayName", "email" }`.
+- `entityId` from application properties mapping (`app.user-entities.trainee`, `.trainer`, `.admin`).
 
-**Exit criteria:** Assessments CRUD and results; validation and certification trigger work; registered in Eureka.
+**2. Add Change Password API** ✅
 
----
+- Endpoint: `PUT /auth/password`; body `{ "currentPassword", "newPassword" }`.
+- Validate current password, encode and store new password via `UserDetailsManager.updateUser()`.
+- Return 204 on success; 401 if token invalid or current password wrong; 400 if new password blank.
 
-### 3.2 Certification Service
+**3. (Optional) Profile Update** ✅
 
-**Purpose:** Issue and store certificates; verify completion/eligibility via Assessment and Validation.
+- `PUT /auth/profile` with body `{ "displayName", "email" }`; in-memory `ProfileStore`; returned in `GET /auth/me`.
 
-**Deliverables:**
-- Add `spring-boot-starter-web`, `spring-boot-starter-data-jpa`, Eureka client, MySQL driver, OpenFeign.
-- Config: port (e.g. `8086`), Eureka, datasource (e.g. `certification_db`), Feign to Assessment, Validation.
-- Entity: Certificate (certificateId, traineeId, courseName, issueDate, validity, etc.).
-- Endpoints: generate certificate (called by Assessment or internal flow), get/download certificate by trainee/course, list certificates.
-- Validation: eligibility via Validation Service; completion/passing from Assessment Service.
-- Access: Trainee (own certificates), Admin; enforced via Gateway/Security.
-- Run and confirm certificate generation and retrieval via Gateway.
+### Exit criteria
 
-**Exit criteria:** Certificates generated and stored; download/view works; integrated with Assessment and Validation.
+- `GET /api/auth/me` with valid JWT returns username, role, entityId (and optional displayName, email). ✅
+- `PUT /api/auth/password` with valid credentials updates password; invalid current password returns 401. ✅
+- Frontend can use entityId for trainee/trainer flows (Phase 3 will consume this). ✅
 
----
+### Files changed (implemented)
 
-## Phase 4: Frontend (Thymeleaf)
-
-**Purpose:** UI for Admin, Trainer, Trainee; all calls go through Gateway with JWT.
-
-### 4.1 Frontend App
-
-**Deliverables:**
-- Add `spring-boot-starter-web`, Thymeleaf, Eureka client (optional; can call Gateway by fixed URL), HTTP client (RestTemplate or WebClient) to call Gateway.
-- Config: port (e.g. `9090`), Gateway base URL (e.g. `http://localhost:8080`), login URL to Security Service (via Gateway).
-- Controllers and pages:
-  - **Home:** Landing with role-based links (Admin / Trainer / Trainee).
-  - **Auth:** Login form → POST to Gateway → Security → store JWT (session/cookie); logout.
-  - **Admin:** Dashboard (aggregate from Course, Trainee, Trainer), Register/Manage Courses, Assign Trainer.
-  - **Trainer:** Dashboard, Create/Evaluate Assessments, View Results, Feedback.
-  - **Trainee:** Dashboard, View/Enroll Courses, Take Assessment, View Results, Certificates, Feedback.
-  - **Profile:** Update details, change password (via Security).
-- All server-side calls: add JWT (or session token) to requests to Gateway; Gateway validates and routes.
-- Run and confirm: login as each role, navigate to key pages, and see data from backend services via Gateway.
-
-**Exit criteria:** All spec’d pages exist; login and role-based access work; data loads from microservices through Gateway.
+- `security-service/src/main/resources/application.properties` — added `app.user-entities.trainee=1`, `.trainer=1`, `.admin=0`.
+- `security-service/.../dto/MeResponse.java` — record (username, role, entityId, displayName, email).
+- `security-service/.../dto/PasswordRequest.java` — record (currentPassword, newPassword).
+- `security-service/.../dto/ProfileRequest.java` — record (displayName, email).
+- `security-service/.../config/UserEntityMapping.java` — component reading properties, `getEntityId(username)`.
+- `security-service/.../service/ProfileStore.java` — in-memory map for displayName/email per username.
+- `security-service/.../config/SecurityConfig.java` — bean return type `UserDetailsManager` (was `UserDetailsService`) for password update.
+- `security-service/.../controller/AuthController.java` — `GET /auth/me`, `PUT /auth/password`, `PUT /auth/profile`; `usernameFromToken()` helper.
 
 ---
 
-## Phase 5: Integration, Security Hardening & Deployment (Optional)
+## Phase 3 — Frontend: Remove Hardcoded IDs ✅ DONE
 
-- **Gateway + Security:** Ensure every route (except login/public) requires valid JWT and correct role where needed.
-- **Global exception handling:** Per-service or Gateway-level error handling and consistent error payloads.
-- **Docker:** Dockerfile per service; `docker-compose` with Eureka, Gateway, Security, MySQL, all business services, frontend; start order as in deployment doc (Eureka first, then Gateway + Security, then rest).
-- **Health checks:** Eureka health; optional Spring Boot Actuator health endpoints for each service.
+**Goal:** Use authenticated identity instead of constants (traineeId=1, trainerId=1).
+
+### Tasks
+
+1. **After login:** call `GET /api/auth/me` (with Bearer token). ✅
+2. **Store entityId in session:** `traineeId` for TRAINEE, `trainerId` for TRAINER. ✅
+3. **Replace all hardcoded IDs** in enrollment, assessment submit, results, certificates, assessment create, evaluate. ✅
+
+### Constraints
+
+- Do not expose entityId in URLs unnecessarily. ✅
+- Prefer session-based access. ✅
+
+### Exit criteria
+
+- Trainee flows use session traineeId; trainer flows use session trainerId. ✅
+- No hardcoded `1` for trainee or trainer identity in forms or API paths. ✅
+
+### Files changed (implemented)
+
+- `frontend-app/.../web/AuthInterceptor.java` — added `SESSION_TRAINEE_ID`, `SESSION_TRAINER_ID`.
+- `frontend-app/.../client/GatewayApiService.java` — added `MeResponse` record (username, role, entityId, displayName, email).
+- `frontend-app/.../controller/AuthController.java` — after login, call `gatewayApi.get(session, "/auth/me", MeResponse.class)` and set `SESSION_TRAINEE_ID` or `SESSION_TRAINER_ID` by role.
+- `frontend-app/.../controller/TraineeController.java` — all trainee endpoints require session traineeId; redirect to login if null; enroll POST takes only `courseId` (traineeId from session); dashboard/results/certificates use session traineeId in API paths; submit assessment uses session traineeId.
+- `frontend-app/.../controller/TrainerController.java` — all trainer endpoints require session trainerId; redirect to login if null; create assessment uses session trainerId for `createdByTrainerId`; evaluate uses session trainerId (removed from form).
+- `frontend-app/.../templates/trainee/enroll.html` — removed Trainee ID field.
+- `frontend-app/.../templates/trainee/take-assessment.html` — removed hidden `traineeId` input.
+- `frontend-app/.../templates/trainer/submissions.html` — removed hidden `trainerId` input.
 
 ---
 
-## Build Order Summary
+## Phase 4 — Feedback Backend ✅ DONE
 
-| Order | Service           | Phase   | Depends on                          |
-|-------|-------------------|---------|-------------------------------------|
-| 1     | Eureka Server     | 1       | —                                   |
-| 2     | API Gateway       | 1       | Eureka                              |
-| 3     | Security Service  | 1       | Eureka                              |
-| 4     | Validation Service| 2       | Eureka, Gateway (for routing)       |
-| 5     | Trainer Service   | 2       | Eureka, Gateway, Security, Validation |
-| 6     | Course Service    | 2       | Eureka, Gateway, Security, Validation, Trainer |
-| 7     | Trainee Service   | 2       | Eureka, Gateway, Security, Validation |
-| 8     | Assessment Service| 3       | Eureka, Gateway, Security, Validation, Certification (optional at start) |
-| 9     | Certification Service | 3   | Eureka, Gateway, Security, Validation, Assessment |
-| 10    | Frontend App      | 4       | Eureka, Gateway, Security, all business services |
+**Goal:** Implement feedback persistence matching existing UI (Feedback Management for Trainer, Feedback for Trainee).
+
+### Tasks
+
+1. **Create Feedback entity** with id, traineeId, trainerId, courseId, rating (1–5), comment, createdAt. ✅
+2. **Create REST APIs:** `POST /feedback`, `GET /feedback/trainee/{id}`, `GET /feedback/trainer/{id}`. ✅
+3. **Validate input:** rating 1–5, non-empty comment in FeedbackService. ✅
+4. **Integrate with Thymeleaf:** Trainee submit form and list; Trainer list. ✅
+
+### Constraints
+
+- Added to **Assessment Service**; new Gateway route `/api/feedback/**` → assessment-service. ✅
+
+### Exit criteria
+
+- Feedback can be submitted and retrieved by trainee and trainer. ✅
+
+### Files changed (implemented)
+
+- `assessment-service`: `entity/Feedback.java`, `repository/FeedbackRepository.java`, `service/FeedbackService.java`, `controller/FeedbackController.java`.
+- `api-gateway/application.properties`: route 7 = `/api/feedback/**` → assessment-service (route 8 = frontend-app).
+- `frontend-app`: `TraineeController` (GET/POST feedback, load list; submit form with rating, comment, optional trainerId/courseId), `TrainerController` (load feedback list); `trainee/feedback.html` (submit form + table), `trainer/feedback.html` (table).
 
 ---
 
-## Per-Service Checklist (Template)
+## Phase 5 — Certification PDF Download ✅ DONE
 
-For each service, use this list:
+**Goal:** Allow trainees to download certificates as PDF.
 
-- [ ] Dependencies added in `pom.xml` (web, JPA, Eureka, Feign, MySQL, etc.).
-- [ ] `application.properties`: port, `spring.application.name`, Eureka URL, DB URL (if applicable).
-- [ ] Main class: `@SpringBootApplication`; for Eureka Server add `@EnableEurekaServer`.
-- [ ] Entities, repositories, services, controllers (as per spec).
-- [ ] Feign clients (if caller): interface + `@EnableFeignClients`, config.
-- [ ] Security: ensure endpoints are called with JWT via Gateway; no duplicate auth in business services unless required.
-- [ ] Manual test: start Eureka (and dependencies), start service, check Eureka dashboard, hit one endpoint via Gateway.
-- [ ] Optional: unit/integration tests.
+### Tasks
 
-Start with **1.1 Eureka Server** and proceed in order. After each service, run the system up to that point and verify before moving on.
+1. **Add endpoint:** `GET /certificates/{id}/download`
+2. **Generate PDF dynamically** using OpenPDF or iText:
+   - Include: certificate code, trainee ID, course name, issue date, validity.
+3. **Return** `Content-Type: application/pdf` (and optionally `Content-Disposition: attachment`).
+
+### Constraints
+
+- Do not store PDFs on disk; generate in-memory.
+
+### Exit criteria
+
+- Request to `GET /api/certificates/{id}/download` with valid id returns PDF.
+- Frontend Certificate page has a “Download” link that uses this endpoint.
+
+### Files to change
+
+- **Done:** `certification-service`: OpenPDF, `CertificateService.generatePdf()`, `GET /certificates/{id}/download`; `frontend-app`: `getForDownload()`, trainee proxy endpoint, Download PDF link in certificates.html.
+
+---
+
+## Phase 6 — Global Exception Handling ✅ DONE
+
+**Goal:** Standardize error responses across all services.
+
+### Tasks
+
+1. Add **`@RestControllerAdvice`** in each service (Eureka and Gateway optional). ✅
+2. **Handle:** `IllegalArgumentException` → 400, `NoSuchElementException` → 404, `Exception` → 500. ✅
+3. **Response format:** `{ "timestamp", "status", "error" }` (ISO-8601 timestamp). ✅
+
+### Constraints
+
+- Do not change existing success response shapes or status codes for valid cases. ✅
+
+### Exit criteria
+
+- Invalid or not-found requests return consistent JSON error body with status 400/404/500. ✅
+
+### Files changed (implemented)
+
+- **security-service:** `exception/ApiError.java` (record: timestamp, status, error), `exception/GlobalExceptionHandler.java` (@RestControllerAdvice, 3 @ExceptionHandler).
+- **validation-service:** same (exception/ApiError, GlobalExceptionHandler).
+- **trainer-service:** same.
+- **course-service:** same.
+- **trainee-service:** same.
+- **assessment-service:** same.
+- **certification-service:** same.
+- Eureka and API Gateway: not modified (optional per plan).
+
+---
+
+## Phase 7 — Docker Deployment ✅ DONE
+
+**Goal:** Containerize the full system per deployment document.
+
+### Tasks
+
+1. **Add Dockerfile** for: ✅
+   - Eureka Server, API Gateway, Security Service, Validation Service
+   - Trainer Service, Course Service, Trainee Service, Assessment Service, Certification Service
+   - Frontend App
+
+2. **Add `docker-compose.yml`:** ✅
+   - Shared network `skilldev-net` for all containers.
+   - **MySQL** container (image `mysql:8.0`, port 3306, volume `mysql_data`); each business service uses `createDatabaseIfNotExist=true` for its DB (`trainer_db`, `course_db`, `trainee_db`, `assessment_db`, `certification_db`).
+   - **Startup order:** MySQL and Eureka start first; Eureka has healthcheck (wget to :8761); Gateway and Security depend on Eureka healthy; Validation depends on Eureka; Trainer/Course/Trainee/Assessment/Certification depend on MySQL + Eureka healthy; Frontend depends on Gateway.
+   - **Environment-based config:** `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`, `APP_SECURITY_SERVICE_URL`, `APP_GATEWAY_URL`, `SPRING_PROFILES_ACTIVE=mysql`, `SPRING_DATASOURCE_URL` (host `mysql`), etc.
+
+### Constraints
+
+- Use **multi-stage builds** (Maven build stage, then JRE run stage). ✅
+- No Kubernetes required. ✅
+
+### Exit criteria
+
+- `docker compose up -d` (or `docker-compose up -d`) brings up the full stack. ✅
+- Frontend: http://localhost:9090 | Gateway: http://localhost:8080 | Eureka: http://localhost:8761. Login and key flows work. ✅
+
+### Files added
+
+- **Dockerfiles:** `eureka-server/Dockerfile`, `api-gateway/Dockerfile`, `security-service/Dockerfile`, `validation-service/Dockerfile`, `trainer-service/Dockerfile`, `course-service/Dockerfile`, `trainee-service/Dockerfile`, `assessment-service/Dockerfile`, `certification-service/Dockerfile`, `frontend-app/Dockerfile` (multi-stage: `maven:3.9-eclipse-temurin-17-alpine` → `eclipse-temurin:17-jre-alpine`; Eureka run stage adds `wget` for healthcheck).
+- **Project root:** `docker-compose.yml` (services, healthchecks, env, network `skilldev-net`, volume `mysql_data`).
+
+---
+
+## Important Rules
+
+- **Do NOT** break existing APIs.
+- **Do NOT** rename services or endpoints.
+- **Keep changes incremental** — one phase at a time, verify before moving on.
+- **Prefer clarity over cleverness.**
+- **Follow Spring Boot best practices.**
+
+---
+
+## Execution Order
+
+| Order | Phase | Depends on | Status |
+|-------|--------|------------|--------|
+| 1 | Phase 1 — API Gateway JWT | Existing Gateway, Security | ✅ Done |
+| 2 | Phase 2 — Security /auth/me + password | Existing Security | ✅ Done |
+| 3 | Phase 3 — Frontend remove hardcoded IDs | Phase 1, Phase 2 | ✅ Done |
+| 4 | Phase 4 — Feedback backend | Existing services, Gateway route if new service | ✅ Done |
+| 5 | Phase 5 — Certificate PDF download | Existing Certification Service | ✅ Done |
+| 6 | Phase 6 — Global exception handling | Any; can be done per service in parallel | ✅ Done |
+| 7 | Phase 7 — Docker deployment | All services stable | ✅ Done |
+
+---
+
+## Reference: Initial System Build Order (Already Done)
+
+The following order was used to build the system initially; use for local run order and for Docker dependencies:
+
+| Order | Service | Port |
+|-------|---------|------|
+| 1 | Eureka Server | 8761 |
+| 2 | API Gateway | 8080 |
+| 3 | Security Service | 8081 |
+| 4 | Validation Service | 8082 |
+| 5 | Trainer Service | 8083 |
+| 6 | Course Service | 8084 |
+| 7 | Trainee Service | 8085 |
+| 8 | Assessment Service | 8086 |
+| 9 | Certification Service | 8087 |
+| 10 | Frontend App | 9090 |
+
+See **HOW_TO_RUN.md** for exact commands and quick tests.
+
+---
+
+## Remaining work from description
+
+**All description-required items are complete.** Profile Page now has update-details and change-password forms (POST /profile/update and POST /profile/password → Gateway PUT /auth/profile and PUT /auth/password).
+
+Optional (not required by description):
+
+- Course Service: verify trainer exists on create (PROJECT_STATUS §2.2).
+- Trainee Service: enrollment eligibility via Validation (PROJECT_STATUS §2.2).
+- Validation Service: optional `POST /validate/feedback` (PROJECT_STATUS §2.1).

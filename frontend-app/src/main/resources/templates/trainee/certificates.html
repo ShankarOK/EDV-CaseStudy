@@ -14,13 +14,14 @@
 <div class="container mt-4">
     <h1>My Certificates</h1>
     <table class="table table-striped">
-        <thead><tr><th>Code</th><th>Course</th><th>Issue Date</th><th>Validity</th></tr></thead>
+        <thead><tr><th>Code</th><th>Course</th><th>Issue Date</th><th>Validity</th><th>Download</th></tr></thead>
         <tbody>
             <tr th:each="cert : ${certificates}">
                 <td th:text="${cert.certificateCode}"></td>
                 <td th:text="${cert.courseName}"></td>
                 <td th:text="${cert.issueDate}"></td>
                 <td th:text="${cert.validityMonths} + ' months'"></td>
+                <td><a th:href="@{/trainee/certificates/{id}/download(id=${cert.id})}" class="btn btn-sm btn-primary" target="_blank" rel="noopener">Download PDF</a></td>
             </tr>
         </tbody>
     </table>

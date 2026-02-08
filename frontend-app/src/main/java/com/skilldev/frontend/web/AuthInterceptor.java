@@ -12,6 +12,8 @@ public class AuthInterceptor implements HandlerInterceptor {
     public static final String SESSION_TOKEN = "token";
     public static final String SESSION_USERNAME = "username";
     public static final String SESSION_ROLE = "role";
+    public static final String SESSION_TRAINEE_ID = "traineeId";
+    public static final String SESSION_TRAINER_ID = "trainerId";
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {

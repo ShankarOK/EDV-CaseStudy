@@ -24,7 +24,6 @@
                 <td th:text="${s.status}"></td>
                 <td>
                     <form th:if="${s.status != 'EVALUATED'}" th:action="@{/trainer/assessments/submissions/{id}/evaluate(id=${s.id})}" method="post" class="d-inline">
-                        <input type="hidden" name="trainerId" value="1"/>
                         <input type="hidden" name="assessmentId" th:value="${assessmentId}"/>
                         <input type="text" name="courseName" placeholder="Course name" class="form-control form-control-sm d-inline-block w-auto"/>
                         <button type="submit" class="btn btn-sm btn-success">Mark Passed / Issue Certificate</button>

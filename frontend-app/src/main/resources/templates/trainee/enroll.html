@@ -16,10 +16,6 @@
     <h1>Enroll in Course</h1>
     <form th:action="@{/trainee/enroll}" method="post">
         <div class="mb-3">
-            <label class="form-label">Trainee ID</label>
-            <input type="number" name="traineeId" class="form-control" value="1" required/>
-        </div>
-        <div class="mb-3">
             <label class="form-label">Course</label>
             <select name="courseId" class="form-select" required>
                 <option value="">-- Select --</option>

@@ -3,7 +3,7 @@ package com.skilldev.frontend.controller;
 import com.skilldev.frontend.client.GatewayApiService;
 import com.skilldev.frontend.web.AuthInterceptor;
 import jakarta.servlet.http.HttpSession;
-import org.springframework.http.HttpStatusCodeException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
